@@ -4,17 +4,18 @@ import pandas as pd
 import joblib
 import numpy as np
 
-from utils import DELTA_NORM, DELTA_RAW
+from utils import DEFAULT_DEVICE, DELTA_NORM, DELTA_RAW
 from utils import load_model
-from data_loader import input_data
+from data_loader import load_input
 from model_builder import create_model
 
-model = create_model('cpu')
+model = create_model(DEFAULT_DEVICE)
 
-model_state,_,_, _, _ = load_model()
-model.load_state_dict(model_state)
+ckpt = load_model()
+model.load_state_dict(ckpt['model_state'])
 
 scaler = joblib.load("scaler.pkl")
+input_data = load_input()
 input_data_norm = scaler.transform(input_data)
 
 inputs = torch.tensor(input_data_norm, dtype=torch.float32)

@@ -6,20 +6,20 @@ import joblib
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 
-from utils import DEVICE, BATCH_SIZE, LR_INIT, LR_MAX, NUM_EPOCH, CKPT_PATH, DELTA_NORM
+from utils import DEFAULT_DEVICE, BATCH_SIZE, LR_INIT, LR_MAX, NUM_EPOCH, CKPT_PATH
 from utils import save_model, load_model
-from data_loader import input_data
+from data_loader import load_input
 from model_builder import create_model
 
 scaler = StandardScaler()
-input_data_norm = scaler.fit_transform(input_data)
+input_data_norm = scaler.fit_transform(load_input())
 joblib.dump(scaler, "scaler.pkl")
 
 inputs = torch.tensor(input_data_norm, dtype=torch.float32)
 dataset = TensorDataset(inputs)
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-model = create_model(DEVICE)
+model = create_model(DEFAULT_DEVICE)
 
 criterion = nn.MSELoss()
 #criterion = nn.HuberLoss(delta=DELTA_NORM)
@@ -27,23 +27,27 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LR_INIT)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=LR_MAX, epochs=NUM_EPOCH, steps_per_epoch=len(dataloader), pct_start=0.3, div_factor=LR_MAX/LR_INIT, final_div_factor=100)
 
-start_epoch = 0
+start_epoch = 1
 if os.path.exists(CKPT_PATH):
     print(f"carico checkpoint {CKPT_PATH}")
 
-    model_state, optimizer_state, scheduler_state, start_epoch, epoch_loss = load_model()
-    model.load_state_dict(model_state)
-    optimizer.load_state_dict(optimizer_state)
-    scheduler.load_state_dict(scheduler_state)
+    ckpt = load_model(map_location=DEFAULT_DEVICE, ckpt_path=CKPT_PATH)
+    
+    start_epoch = ckpt['epoch'] + 1
+    epoch_loss = ckpt['epoch_loss']
+
+    model.load_state_dict(ckpt['model_state'])
+    optimizer.load_state_dict(ckpt['optimizer_state'])
+    scheduler.load_state_dict(ckpt['scheduler_state'])
 
     print(f"riprendo da epoch {start_epoch}, epoch_loss={epoch_loss:.4f}")
 
 model.train()
-for epoch in range(start_epoch, NUM_EPOCH):
+for epoch in range(start_epoch, NUM_EPOCH + 1):
     epoch_loss = 0
     for (x,) in dataloader:
         print("inizio batch")
-        x = x.to(DEVICE)
+        x = x.to(DEFAULT_DEVICE)
 
         y_hat = model(x)
 
@@ -64,9 +68,9 @@ for epoch in range(start_epoch, NUM_EPOCH):
 
     epoch_loss /= len(dataloader)
 
-    print(f"Epoch {epoch+1}/{NUM_EPOCH}, epoch_loss={epoch_loss:.4f}")
+    print(f"Epoch {epoch}/{NUM_EPOCH}, epoch_loss={epoch_loss:.4f}")
 
-    if (epoch + 1) % 30 == 0:
+    if epoch % 30 == 0:
         save_model(epoch, epoch_loss, model.state_dict(), optimizer.state_dict(), scheduler.state_dict())
         print(f"Nuovo BEST (epoch_loss={epoch_loss:.4f}) salvato")
 
