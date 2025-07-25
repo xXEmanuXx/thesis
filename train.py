@@ -6,7 +6,7 @@ import joblib
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 
-from utils import DEFAULT_DEVICE, BATCH_SIZE, LR_INIT, LR_MAX, NUM_EPOCH, CKPT_PATH
+from utils import DEFAULT_DEVICE, DEFAULT_DTYPE, BATCH_SIZE, LR_INIT, LR_MAX, NUM_EPOCH, CKPT_PATH
 from utils import save_model, load_model
 from data_loader import load_input
 from model_builder import create_model
@@ -15,7 +15,7 @@ scaler = StandardScaler()
 input_data_norm = scaler.fit_transform(load_input())
 joblib.dump(scaler, "scaler.pkl")
 
-inputs = torch.tensor(input_data_norm, dtype=torch.float32)
+inputs = torch.tensor(input_data_norm, dtype=DEFAULT_DTYPE)
 dataset = TensorDataset(inputs)
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 

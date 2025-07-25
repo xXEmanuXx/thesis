@@ -11,5 +11,4 @@ __pycache__
 # pca directory for testing purposes
 pca
 
-# text files for remembering infos
-*.txt
+roadmap.txt
