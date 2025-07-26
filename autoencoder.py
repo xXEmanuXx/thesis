@@ -3,30 +3,34 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from encoder.first_layer import MetapathwayGraphEncoder
-from encoder.second_layer import MetapathwayToPathwayEncoder
+from metapathway_layers import MetapathwayEncoder, MetapathwayDecoder
+from pathway_layers import PathwayEncoder, PathwayDecoder
+from dense_layers import DenseEncoder, DenseDecoder
 
-from decoder.first_layer import PathwayToMetapathwayDecoder
-from decoder.second_layer import MetapathwayGraphDecoder
+from utils import NEGATIVE_SLOPE
 
 class Encoder(nn.Module):
-    def __init__(self, graph_mask: torch.Tensor, latent_mask: torch.Tensor) -> None:
+    def __init__(self, graph_mask: torch.Tensor, latent_mask: torch.Tensor, hidden=1024, bottleneck=512) -> None:
         super().__init__()
-        self.first_layer = MetapathwayGraphEncoder(graph_mask.size(1), graph_mask.size(0), graph_mask)
-        self.second_layer = MetapathwayToPathwayEncoder(latent_mask.size(1), latent_mask.size(0), latent_mask)
+        self.first_layer = MetapathwayEncoder(graph_mask.size(1), graph_mask.size(0), graph_mask)
+        self.second_layer = PathwayEncoder(latent_mask.size(1), latent_mask.size(0), latent_mask)
+        self.d = DenseEncoder(latent_mask.size(0), hidden=hidden, bottleneck=bottleneck)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.first_layer(x)
         x = self.second_layer(x)
+        x = self.d(x)
         return x
     
 class Decoder(nn.Module):
-    def __init__(self, graph_mask: torch.Tensor, latent_mask: torch.Tensor) -> None:
+    def __init__(self, graph_mask: torch.Tensor, latent_mask: torch.Tensor, hidden=1024, bottleneck=512) -> None:
         super().__init__()
-        self.first_layer = PathwayToMetapathwayDecoder(latent_mask.size(1), latent_mask.size(0), latent_mask)
-        self.second_layer = MetapathwayGraphDecoder(graph_mask.size(1), graph_mask.size(0), graph_mask)
+        self.d = DenseDecoder(latent_mask.size(1), hidden=hidden, bottleneck=bottleneck)
+        self.first_layer = PathwayDecoder(latent_mask.size(1), latent_mask.size(0), latent_mask)
+        self.second_layer = MetapathwayDecoder(graph_mask.size(1), graph_mask.size(0), graph_mask)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.d(x)
         x = self.first_layer(x)
         x = self.second_layer(x)
         return x

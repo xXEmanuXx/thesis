@@ -90,7 +90,6 @@ def load_metapathway_tables(*, root: Path) -> Tuple[pd.DataFrame, pd.DataFrame, 
     tuple
         `(tumor_df, nodes_df, edges_df, pathway_df)` all as *pandas* dataframes.
     """
-    
     root = Path(root)
 
     return (

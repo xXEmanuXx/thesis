@@ -28,65 +28,12 @@ METAPATHWAY_NODES = 20507
 
 # Hyper parameters
 BATCH_SIZE = 222
-NUM_EPOCH = 1
+NUM_EPOCH = 150
 LR_INIT = 1e-3
 LR_MAX = 1e-2
 NEGATIVE_SLOPE = 0.04 # Leaky ReLU
 DELTA_RAW = 700 # 57, 80, 41, 54, 700
 DELTA_NORM = 20
-
-def build_weight(weight: torch.Tensor, mask: torch.Tensor, init: Literal['kaiming', 'xavier'] = 'kaiming') -> torch.Tensor:
-    """
-    Initialise `weight` only on positions where `mask==True`.
-
-    Parameters
-    ----------
-    weight
-        Pre-allocated weight tensor `(out_features, in_features)` **on target device**.
-    mask
-        Boolean tensor with the same shape as `weight`. `True` marks edges to keep.
-    init
-        Fan-based scheme. *kaiming* (default) or *xavier*.
-
-    Returns
-    -------
-    torch.Tensor
-        The same tensor instance, now initialised.
-
-    Notes
-    -----
-    - Funziona in-place per non creare memoria extra.
-    - Per ridurre il garbage interpreter, usiamo lista-comprehension su CPU e poi spostiamo su device se necessario.
-    """
-    
-    if weight.shape != mask.shape:
-        raise ValueError("`weight` and `mask` must have identical shape")
-
-    n_out, n_in = weight.shape
-
-    rows, cols = mask.nonzero(as_tuple=True)
-    fan_in = torch.bincount(rows, minlength=n_out).clamp(min=1)
-    
-    rows_list = rows.tolist()
-    cols_list = cols.tolist()
-
-    if init == 'kaiming':
-        bound = torch.sqrt(torch.tensor(6.0, device=weight.device) / fan_in.float())
-    elif init == 'xavier':
-        fan_out = torch.bincount(torch.tensor(cols_list), minlength=n_in).clamp(min=1)
-        fan_avg = (fan_in.unsqueeze(1) + fan_out.unsqueeze(0)) / 2
-        bound = torch.sqrt(torch.tensor(6.0, device=weight.device) / fan_avg.float())
-    else:
-        raise ValueError("`init` must be 'kaiming' o 'xavier'")
-
-    # genera pesi solo dove mask=True
-    #rand = torch.empty(int(mask.sum().item()), device=weight.device).uniform_(-1.0, 1.0)
-    rand = torch.empty(int(mask.sum()), device=weight.device).uniform_(-1.0, 1.0)
-    per_edge_bound = bound[torch.tensor(rows_list)]
-    #per_edge_bound = bound[rows]
-    weight[mask] = rand * per_edge_bound
-
-    return weight
 
 def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
     """
