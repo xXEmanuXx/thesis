@@ -12,28 +12,30 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import Literal, Any
+from typing import Any
 import pandas as pd
 import torch
 import zstandard as zstd
 
-DEFAULT_DEVICE: torch.device = torch.device('cpu')
+DEFAULT_DEVICE: torch.device = torch.device("cpu")
 DEFAULT_DTYPE: torch.dtype = torch.float32
 
-DATA_PATH: Path = Path('data')
-CKPT_PATH: Path = Path('autoencoder.pt')
+DATA_PATH: Path = Path("data")
+RESULTS_DIR: Path = Path("sweeps")
+RESULTS_DIR.mkdir(exist_ok=True)
+RESULTS_FILE: Path = RESULTS_DIR / "results.jsonl"
+RESULTS_FILE.touch(exist_ok=True)
+RESET_RESULTS_ON_START: bool = True
 
-# Data
 METAPATHWAY_NODES = 20507
 
-# Hyper parameters
 BATCH_SIZE = 222
-NUM_EPOCH = 150
-LR_INIT = 1e-3
-LR_MAX = 1e-2
-NEGATIVE_SLOPE = 0.04 # Leaky ReLU
-DELTA_RAW = 700 # 57, 80, 41, 54, 700
-DELTA_NORM = 20
+NUM_EPOCH = 1
+VAL_SPLIT = 0.15
+EARLY_STOP = 10
+
+#DELTA_RAW = 700 # 57, 80, 41, 54, 700
+#DELTA_NORM = 20
 
 def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
     """
@@ -54,9 +56,6 @@ def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
     torch.Tensor
         tensor containing `True` values where an edge exists between two nodes
 
-    Notes
-    -----
-    Returned tensor is placed on `DEFAULT_DEVICE`.
     """
 
     src_unique = src.drop_duplicates().tolist()
@@ -78,7 +77,7 @@ def save_model(epoch: int,
                optimizer_state: dict[str, Any], 
                scheduler_state: dict[str, Any],
                *,
-               ckpt_path: Path = CKPT_PATH) -> None:
+               ckpt_path: Path) -> None:
 
     """
     Compresses and saves to disk an object which contains information regardin the model training
@@ -112,7 +111,7 @@ def save_model(epoch: int,
 
     ckpt_path.write_bytes(compressed)
 
-def load_model(*, map_location: torch.device = DEFAULT_DEVICE, ckpt_path: Path = CKPT_PATH) -> dict[str, Any]:
+def load_model(*, map_location: torch.device = DEFAULT_DEVICE, ckpt_path: Path) -> dict[str, Any]:
 
     """
     Decompresses and loads the model for training

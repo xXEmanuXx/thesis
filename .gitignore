@@ -1,15 +1,10 @@
-# model states and scaler states
-*.pt
-*.pkl
-
 # jupyter notebooks for data analysis
 *.ipynb
 
 # python cache directories
 __pycache__
 
-# pca directory for testing purposes
 pca
-
 roadmap.txt
 unused
+sweeps

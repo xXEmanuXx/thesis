@@ -14,7 +14,7 @@ import functools
 from pathlib import Path
 from typing import Sequence, Tuple
 
-from utils import DEFAULT_DEVICE, DEFAULT_DTYPE, DATA_PATH
+from utils import DEFAULT_DEVICE, DATA_PATH
 
 def filter_input_df(df: pd.DataFrame, filter_df: pd.DataFrame, filter_id_col: str) -> pd.DataFrame:
     """
@@ -104,9 +104,10 @@ def _prepare_default_tensors_cached(root: Path, device: torch.device):
     """
     Internal cache keyed by *(root, str(device))* so CPU/GPU tensors co-exist.
     """
+
     tumor_df, nodes_df, edges_df, pathway_df = load_metapathway_tables(root=root)
 
-    tumor_df = filter_input_df(tumor_df, nodes_df, '#Id')
+    tumor_df = filter_input_df(tumor_df, nodes_df, "#Id")
 
     nodes_ids = nodes_df["#Id"].astype(str).tolist()
     tumor_ids = tumor_df.index.astype(str).tolist()
@@ -128,29 +129,29 @@ def prepare_default_tensors(*, root: Path, device: torch.device) -> dict[str, to
     return _prepare_default_tensors_cached(Path(root), device)
 
 def _single_tensor(name: str, *, root:Path, device: torch.device):
+    """
+    Returns one tensor of the cached ones
+    """
     return prepare_default_tensors(root=root, device=device)[name]
 
 
 def load_idx_in(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    """Return **idx_in** tensor (input → meta-pathway total)."""
     return _single_tensor("idx_in", root=root, device=device)
 
 
 def load_idx_src(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    """Return **idx_src** tensor (meta-pathway total → source nodes)."""
     return _single_tensor("idx_src", root=root, device=device)
 
 
 def load_idx_tgt(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    """Return **idx_tgt** tensor (meta-pathway target → total)."""
     return _single_tensor("idx_tgt", root=root, device=device)
 
 
 def load_idx_pathway(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    """Return **idx_pathway** tensor (meta-pathway total → pathway source)."""
     return _single_tensor("idx_pathway", root=root, device=device)
 
 def load_input(*, root: Path = DATA_PATH) -> np.ndarray:
     tumor_df, nodes_df, _, _ = load_metapathway_tables(root=root)
-    tumor_df = filter_input_df(tumor_df, nodes_df, '#Id')
+    tumor_df = filter_input_df(tumor_df, nodes_df, "#Id")
+
     return tumor_df.T.values

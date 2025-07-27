@@ -1,27 +1,21 @@
 import torch.nn as nn
-from utils import NEGATIVE_SLOPE
-
-def _block(in_f: int, out_f: int, p_drop: float = 0.1):
-    return nn.Sequential(
-        nn.Linear(in_f, out_f),
-        nn.LeakyReLU(negative_slope=NEGATIVE_SLOPE),
-        nn.BatchNorm1d(out_f),
-        nn.Dropout(p_drop),
-    )
 
 class DenseEncoder(nn.Sequential):
-    """Pathway → bottleneck"""
-    def __init__(self, pathway_dim: int, hidden: int = 1024, bottleneck: int = 256):
-        super().__init__(
-            _block(pathway_dim, hidden),
-            _block(hidden, bottleneck, p_drop=0.05)   # bottleneck
+    def __init__(self, pathway_dim: int, p_drop: float, negative_slope: float, mid_dim: int = 2048, bottleneck: int = 1024):
+         super().__init__(
+            nn.Linear(pathway_dim, mid_dim),
+            nn.LeakyReLU(negative_slope),
+            nn.Dropout(p_drop),
+            nn.Linear(mid_dim, bottleneck),
+            nn.LeakyReLU(negative_slope)
         )
-        self.out_features = bottleneck          # ci serve nel decoder
 
 class DenseDecoder(nn.Sequential):
-    """bottleneck → Pathway"""
-    def __init__(self, pathway_dim: int, hidden: int = 1024, bottleneck: int = 256):
+    def __init__(self, pathway_dim: int, p_drop: float, negative_slope: float, mid_dim: int = 2048, bottleneck: int = 1024):
         super().__init__(
-            _block(bottleneck, hidden),
-            _block(hidden, pathway_dim, p_drop=0.0)
+            nn.Linear(bottleneck, mid_dim),
+            nn.LeakyReLU(negative_slope),
+            nn.Dropout(p_drop),
+            nn.Linear(mid_dim, pathway_dim),
+            nn.LeakyReLU(negative_slope)
         )

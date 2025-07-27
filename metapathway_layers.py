@@ -1,10 +1,26 @@
+"""
+Metapathway-level encoder and decoder
+
+This module implement both the metapathway layer encoder and decoder described by the `metapathway_edges_simplified_2025.tsv` file
+
+**Encoder**
+    It projects the filtered input nodes into the metapathway and
+    applies the masked weight matrix created using the edges (source -> target) specified in the file.
+    The output of the layer is then scattered inside the metapathway nodes tensor
+
+**Decoder**
+    It projects the "input" nodes from the previous layer into the metapathway tensor and
+    applies the same masked weight matrix of the file.
+    The output is again scattered inside the metapathway nodes tensor and lastly we filter it by taking the nodes that correspond to the reconstructed input
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from data_loader import  load_idx_in, load_idx_src, load_idx_tgt, load_idx_pathway
+from data_loader import load_idx_in, load_idx_src, load_idx_tgt, load_idx_pathway
 
-from utils import METAPATHWAY_NODES, NEGATIVE_SLOPE, DEFAULT_DEVICE, DEFAULT_DTYPE
+from utils import METAPATHWAY_NODES, DEFAULT_DEVICE, DEFAULT_DTYPE
 
 class MetapathwayEncoder(nn.Linear):
     mask: torch.Tensor
@@ -13,21 +29,23 @@ class MetapathwayEncoder(nn.Linear):
     idx_tgt: torch.Tensor
     scratch: torch.Tensor
 
-    def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, bias: bool = True) -> None:
+    def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, negative_slope: float, bias: bool = True) -> None:
         super().__init__(in_features, out_features, bias) # Initialize weight matrix and bias vector
+        
         self.register_buffer("mask", mask) # Mask specifying which edges are effectively there
-
-        with torch.no_grad():
-            nn.init.kaiming_uniform_(self.weight)
-            self.weight *= self.mask
-            self.bias.zero_()
-
         # Buffers used to filter and scatter metapathway layer
         self.register_buffer("idx_in", load_idx_in())
         self.register_buffer("idx_src", load_idx_src())
         self.register_buffer("idx_tgt", load_idx_tgt())
 
         self.register_buffer("scratch", torch.empty(0, dtype=DEFAULT_DTYPE, device=DEFAULT_DEVICE), persistent=False)
+
+        self.negative_slope = negative_slope
+
+        with torch.no_grad():
+            nn.init.kaiming_uniform_(self.weight)
+            self.weight *= self.mask
+            self.bias.zero_()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         BATCH = x.size(0)
@@ -44,7 +62,7 @@ class MetapathwayEncoder(nn.Linear):
 
         x_src = x_full[:, self.idx_src]
 
-        z = F.leaky_relu(F.linear(x_src, self.weight * self.mask, self.bias), negative_slope=NEGATIVE_SLOPE)
+        z = F.leaky_relu(F.linear(x_src, self.weight * self.mask, self.bias), negative_slope=self.negative_slope)
 
         x_full.scatter_(1, self.idx_tgt.expand(BATCH, -1), z)
 
@@ -58,14 +76,9 @@ class MetapathwayDecoder(nn.Linear):
     idx_pathway: torch.Tensor
     scratch: torch.Tensor
 
-    def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, bias: bool = True) -> None:
+    def __init__(self, in_features: int, out_features: int, mask: torch.Tensor,  negative_slope: float, bias: bool = True) -> None:
         super().__init__(in_features, out_features, bias)
         self.register_buffer("mask", mask)
-
-        with torch.no_grad():
-            nn.init.kaiming_uniform_(self.weight)
-            self.weight *= self.mask
-            self.bias.zero_()
 
         self.register_buffer("idx_pathway", load_idx_pathway())
         self.register_buffer("idx_src", load_idx_src())
@@ -73,6 +86,13 @@ class MetapathwayDecoder(nn.Linear):
         self.register_buffer("idx_in", load_idx_in())
 
         self.register_buffer("scratch", torch.empty(0, dtype=DEFAULT_DTYPE, device=DEFAULT_DEVICE), persistent=False)
+
+        self.negative_slope = negative_slope
+        
+        with torch.no_grad():
+            nn.init.kaiming_uniform_(self.weight)
+            self.weight *= self.mask
+            self.bias.zero_()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         BATCH = x.size(0)
@@ -88,7 +108,7 @@ class MetapathwayDecoder(nn.Linear):
 
         x_src = x_full[:, self.idx_src]
 
-        z = F.leaky_relu(F.linear(x_src, self.weight * self.mask, self.bias), negative_slope=NEGATIVE_SLOPE)
+        z = F.leaky_relu(F.linear(x_src, self.weight * self.mask, self.bias), negative_slope=self.negative_slope)
 
         x_full.scatter_(1, self.idx_tgt.expand(BATCH, -1), z)
 
