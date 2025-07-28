@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import joblib
+from textwrap import indent
 
+import joblib
 import pandas as pd
-import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -34,66 +34,97 @@ def load_run_cfg(run_id: str):
     
     raise ValueError(f"run_id {run_id} not found in {results_file}")
 
-def main(args: argparse.Namespace) -> None:
-    run_id = args.run_id
+def section(title: str) -> None:
+    """Print a section header."""
+    line = "=" * len(title)
+    print(f"\n{title}\n{line}")
+
+def print_summary(metrics: dict[str, float]) -> None:
+    for k, v in metrics.items():
+        print(f"{k:<30}: {v:.6f}")
+
+
+def _select_columns(columns: list[str], n_features: int) -> list[str]:
+    """Return *n_features* columns: half from the start and half from the end."""
+    if n_features >= len(columns):
+        return list(columns)
+    first_half = n_features // 2
+    last_half = n_features - first_half
+
+    return list(columns[:first_half]) + list(columns[-last_half:])
+
+def preview_dataframe(df_input: pd.DataFrame, df_output: pd.DataFrame, n_samples: int, n_features: int) -> None:
+    """Show *n* sample rows of input vs output side-by-side."""
+    cols = _select_columns(df_input.columns.tolist(), n_features)
+    df_preview = pd.concat({"input": df_input[cols].head(n_samples), "output": df_output[cols].head(n_samples)}, axis=1)
+    print(df_preview)
+
+def preview_mean(df_input: pd.DataFrame, n_features: int) -> None:
+    cols = _select_columns(df_input.columns.tolist(), n_features)
+    print(df_input[cols].mean(axis=0))
+
+def evaluate(run_id: str, n_samples: int, n_features: int) -> None:
+    section(f"Evaluating run: {run_id}")
 
     cfg = load_run_cfg(run_id)
-    dropout = cfg.get("dropout")
-    negative_slope = cfg.get("negative_slope")
+    print("Hyper-parameters:")
+    print(indent(json.dumps(cfg, indent=2), "  "))
 
-    print(f"Run {run_id}: dropout={dropout} negative_slope={negative_slope}")
-
-    model = model_builder.create_model(dropout, negative_slope)
     ckpt = utils.load_model(ckpt_path=utils.RESULTS_DIR / run_id / "best.pt")
-
-    model.load_state_dict(ckpt["model_state"])
     scaler = joblib.load(utils.RESULTS_DIR / run_id / "scaler.pkl")
-
     splits = json.loads(utils.SPLIT_FILE.read_text())
+    
+    model = model_builder.create_model(
+        cfg.get("dropout"),
+        cfg.get("negative_slope"),
+        latent_dim=cfg.get("latent_dim"),
+        fc_dims=list(map(int, cfg.get("fc_dims").split(","))),
+    )
+    model.load_state_dict(ckpt["model_state"])
 
-    input_raw = data_loader.load_input()
-    input_raw = input_raw[splits["test"], :]
+    input_raw = data_loader.load_input()[splits["test"], :]
     input_norm = scaler.transform(input_raw)
-
-    input = torch.tensor(input_norm, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)
+    input_tensor = torch.tensor(input_norm, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)
 
     model.eval()
     with torch.no_grad():
-        output = model(input)
+        output_tensor = model(input_tensor)
+    output_raw = scaler.inverse_transform(output_tensor.cpu().numpy())
 
-    output_raw = scaler.inverse_transform(output.cpu().numpy())
+    mse_norm = F.mse_loss(output_tensor, input_tensor).item()
+    mse_raw = F.mse_loss(
+        torch.tensor(output_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE),
+        torch.tensor(input_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)
+    ).item()
 
-    mse_norm = F.mse_loss(output, input).item()
-    mse_raw = F.mse_loss(torch.tensor(output_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE), torch.tensor(input_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)).item()
-    #mse_norm = F.huber_loss(output, input, delta=DELTA_NORM).item()
-    #mse_raw = F.huber_loss(torch.tensor(output_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE), torch.tensor(input_raw, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE), delta=DELTA_RAW).item()
-    
-    print(f"MSE norm: {mse_norm:.4f} MSE raw: {mse_raw:.4f}")
+    df_input = pd.DataFrame(input_raw, columns=[f"F{i}" for i in range(input_raw.shape[1])])
+    df_output = pd.DataFrame(output_raw, columns=df_input.columns)
 
-    df_input = pd.DataFrame(input_raw, columns=[f"Feature_{i}" for i in range(input_raw.shape[1])])
-    df_output = pd.DataFrame(output_raw, columns=[f"Feature_{i}" for i in range(input_raw.shape[1])])
+    section("Reconstruction metrics")
+    print_summary({
+        "MSE (normalised)": mse_norm,
+        "MSE (raw)": mse_raw,
+    })
 
-    pd.set_option('display.max_columns', 60)
+    section(f"Preview of first {n_samples} test samples (raw)")
+    preview_dataframe(df_input, df_output, n_samples, n_features)
 
-    print("Input valori raw")
-    print(df_input.head(10))
-    print("Output valori raw, applicata la inverse_transform() sull'output del modello (norm)")
-    print(df_output.head(10))
+    section("Mean of the input features displayed above")
+    preview_mean(df_input, n_features)
 
-    df_diff = df_input - df_output
-    abs_all  = df_diff.abs().values.ravel().astype(float)
-    delta_90 = np.percentile(abs_all, 90)
-    print(f"delta (90° percentile) ≈ {delta_90:.2f}")
-
-    print("media per feature")
-    print(df_input.mean(axis=0, numeric_only=True).head(30))
-
-    # 1) distribuzione output vs input (norm)
-    print("mean in/out", input.mean().item(), output.mean().item())
-    print("std  in/out", input.std().item(),  output.std().item())
+    section("Distribution check (normalised space)")
+    mu_in, mu_out = input_tensor.mean().item(), output_tensor.mean().item()
+    sd_in, sd_out = input_tensor.std().item(), output_tensor.std().item()
+    print(
+        f"Mean input / output : {mu_in:.4f} / {mu_out:.4f}\n"
+        f"Std  input / output : {sd_in:.4f} / {sd_out:.4f}"
+    )
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Evaluate a run best.pt from sweep")
-    p.add_argument("--run_id", required=True, help="Run ID (eg. sweep_0042)")
-    
-    main(p.parse_args())
+    parser = argparse.ArgumentParser(description="Evaluate a run from sweep results")
+    parser.add_argument("--run_id", required=True, help="Run ID, e.g. sweep_0042")
+    parser.add_argument("--n_samples", type=int, default=10, help="Samples to preview")
+    parser.add_argument("--n_features", type=int, default=10, help="Features to preview")
+    args = parser.parse_args()
+
+    evaluate(args.run_id, args.n_samples, args.n_features)

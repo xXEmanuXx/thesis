@@ -13,7 +13,12 @@ import utils
 import data_loader
 from autoencoder import AutoEncoder
 
-def create_model(dropout: float, negative_slope: float, device: torch.device = utils.DEFAULT_DEVICE, dtype: torch.dtype = utils.DEFAULT_DTYPE):
+def create_model(dropout: float,
+                 negative_slope: float,
+                 fc_dims: list[int],
+                 latent_dim: int,
+                 device: torch.device = utils.DEFAULT_DEVICE,
+                 dtype: torch.dtype = utils.DEFAULT_DTYPE):
     """
     Instantiate an :class:`~autoencoder.AutoEncoder` ready for training.
 
@@ -38,7 +43,13 @@ def create_model(dropout: float, negative_slope: float, device: torch.device = u
     metapathway_mask = utils.build_mask(edges_df["#Source"], edges_df["Target"])
     pathway_mask = utils.build_mask(pathway_df["NodeId"], pathway_df["#PathwayId"])
 
-    model = AutoEncoder(metapathway_mask=metapathway_mask, pathway_mask=pathway_mask, dropout=dropout, negative_slope=negative_slope)
+    model = AutoEncoder(metapathway_mask=metapathway_mask,
+                        pathway_mask=pathway_mask,
+                        fc_dims=fc_dims,
+                        latent_dim=latent_dim,
+                        dropout=dropout,
+                        negative_slope=negative_slope)
+    
     model = model.to(device=device, dtype=dtype)
 
     return model

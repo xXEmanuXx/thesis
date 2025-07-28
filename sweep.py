@@ -18,12 +18,13 @@ import utils
 import data_loader
 
 PARAM_GRID: Dict[str, List] = {
-    "lr_init": [1e-3],
-    "lr_max": [1e-2],
-    "weight_decay": [0],
-    "dropout": [0.05],
-    "negative_slope": [0.03],
-    "grad_clip": [1.0]
+    "lr": ["1e-3,1e-2", "1e-3,3e-3", "3e-4,1e-2"],
+    "weight_decay": [0.0, 1e-4],
+    "dropout": [0.0, 0.1],
+    "negative_slope": [0.02, 0.03],
+    "grad_clip": [1.0],
+    "latent_dim": [1024, 512],
+    "fc_dims": ["2048,1024", "1536,1024"],
 }
 
 def dict_product(param_grid: Dict[str, List]):

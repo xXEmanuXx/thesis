@@ -15,4 +15,5 @@ Eseguire `sweep.py` per effettuare un training per ogni combinazione di iper-par
 ## Output
 Ogni training viene salvato all'interno della directory `sweeps/sweep_####` per poter essere valutato tramite `eval.py`
 Nel file `sweeps/results.jsonl` sono presenti tutte le metriche dei diversi training per poter valutare la migliore combinazione di iper-parametri.
-Nel file `sweeps/split_indices.json` sono presenti gli indici generati casualmente per suddividere il dataset in training, validation e test set. Ogni training e lo script di valutazione usano lo stesso set di indici.
+Nel file `sweeps/split_indices.json` sono presenti gli indici generati casualmente per suddividere il dataset in training, validation e test set.
+Ogni training e lo script di valutazione usano lo stesso set di indici.

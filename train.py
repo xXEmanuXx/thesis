@@ -30,12 +30,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Train Metapathway Auto-Encoder")
 
     p.add_argument("--run_id", required=True, help="unique run id")
-    p.add_argument("--lr_init", type=float, default=1e-3)
-    p.add_argument("--lr_max", type=float, default=1e-2)
+    p.add_argument("--lr", default="1e-3,1e-2")
     p.add_argument("--weight_decay", type=float, default=0.0)
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--negative_slope", type=float, default=0.03)
     p.add_argument("--grad_clip", type=float, default=1.0)
+    p.add_argument("--latent_dim", type=int, default=1024)
+    p.add_argument("--fc_dims", default="2048,1024")
 
     return p
 
@@ -93,15 +94,17 @@ def main(args: argparse.Namespace):
     train_loader = DataLoader(train_set, batch_size=utils.BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=utils.BATCH_SIZE, shuffle=False)
 
-    model = model_builder.create_model(args.dropout, args.negative_slope)
+    model = model_builder.create_model(args.dropout, args.negative_slope, latent_dim=args.latent_dim, fc_dims=list(map(int, args.fc_dims.split(","))))
 
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
 
-    div_factor = args.lr_max / args.lr_init
+    lr_init, lr_max = map(float, args.lr.split(","))
+    optimizer = optim.AdamW(model.parameters(), lr=lr_init, weight_decay=args.weight_decay)
+
+    div_factor = lr_max / lr_init
     scheduler = optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=args.lr_max,
+        max_lr=lr_max,
         epochs=utils.NUM_EPOCH,
         steps_per_epoch=len(train_loader),
         pct_start=0.3,
