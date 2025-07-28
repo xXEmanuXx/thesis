@@ -10,11 +10,13 @@ import numpy as np
 import pandas as pd
 import torch
 import functools
+import json
+import secrets
 
 from pathlib import Path
 from typing import Sequence, Tuple
 
-from utils import DEFAULT_DEVICE, DATA_PATH
+import utils
 
 def filter_input_df(df: pd.DataFrame, filter_df: pd.DataFrame, filter_id_col: str) -> pd.DataFrame:
     """
@@ -45,8 +47,8 @@ def filter_input_df(df: pd.DataFrame, filter_df: pd.DataFrame, filter_id_col: st
 def build_index_tensor(subset_ids: Sequence[str | int], 
                        universe_ids: Sequence[str | int], 
                        *, 
-                       device: torch.device = DEFAULT_DEVICE, 
-                       dtype: torch.dtype = torch.long) -> torch.Tensor:
+                       dtype: torch.dtype, 
+                       device: torch.device) -> torch.Tensor:
     
     """
     Map `subset_ids` to their integer positions inside `universe_ids`.
@@ -90,7 +92,6 @@ def load_metapathway_tables(*, root: Path) -> Tuple[pd.DataFrame, pd.DataFrame, 
     tuple
         `(tumor_df, nodes_df, edges_df, pathway_df)` all as *pandas* dataframes.
     """
-    root = Path(root)
 
     return (
         pd.read_csv(root / "test_tumor_samples.tsv", sep="\t"),
@@ -100,10 +101,8 @@ def load_metapathway_tables(*, root: Path) -> Tuple[pd.DataFrame, pd.DataFrame, 
     )
 
 @functools.lru_cache(maxsize=None)
-def _prepare_default_tensors_cached(root: Path, device: torch.device):
-    """
-    Internal cache keyed by *(root, str(device))* so CPU/GPU tensors co-exist.
-    """
+def _prepare_default_tensors_cached(root: Path, dtype: torch.dtype, device: torch.device) -> dict[str, torch.Tensor]:
+    """Internal cache keyed by *(root, str(device))* so CPU/GPU tensors co-exist."""
 
     tumor_df, nodes_df, edges_df, pathway_df = load_metapathway_tables(root=root)
 
@@ -116,42 +115,55 @@ def _prepare_default_tensors_cached(root: Path, device: torch.device):
     pathway_nodes_source_ids = pathway_df["NodeId"].astype(str).drop_duplicates().tolist()
 
     return {
-        "idx_in": build_index_tensor(tumor_ids, nodes_ids, device=device),
-        "idx_src": build_index_tensor(nodes_source_ids, nodes_ids, device=device),
-        "idx_tgt": build_index_tensor(nodes_target_ids, nodes_ids, device=device),
-        "idx_pathway": build_index_tensor(pathway_nodes_source_ids, nodes_ids, device=device),
+        "idx_in": build_index_tensor(tumor_ids, nodes_ids, dtype=dtype, device=device),
+        "idx_src": build_index_tensor(nodes_source_ids, nodes_ids, dtype=dtype, device=device),
+        "idx_tgt": build_index_tensor(nodes_target_ids, nodes_ids, dtype=dtype, device=device),
+        "idx_pathway": build_index_tensor(pathway_nodes_source_ids, nodes_ids, dtype=dtype, device=device),
     }
 
-def prepare_default_tensors(*, root: Path, device: torch.device) -> dict[str, torch.Tensor]:
-    """
-    Public wrapper around the cached implementation
-    """
-    return _prepare_default_tensors_cached(Path(root), device)
+def prepare_default_tensors(*, root: Path, dtype: torch.dtype, device: torch.device) -> dict[str, torch.Tensor]:
+    """Public wrapper around the cached implementation"""
 
-def _single_tensor(name: str, *, root:Path, device: torch.device):
-    """
-    Returns one tensor of the cached ones
-    """
-    return prepare_default_tensors(root=root, device=device)[name]
+    return _prepare_default_tensors_cached(root, dtype, device)
 
+def load_idx(name: str, *, root: Path = utils.DATA_DIR, dtype: torch.dtype = torch.long, device: torch.device = utils.DEFAULT_DEVICE) -> torch.Tensor:
+    """Returns one tensor of the cached ones"""
 
-def load_idx_in(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    return _single_tensor("idx_in", root=root, device=device)
+    return prepare_default_tensors(root=root, dtype=dtype, device=device)[name]
 
+def load_input(*, root: Path = utils.DATA_DIR) -> np.ndarray:
+    """Returns filtered input over metapathway nodes with shape (n_samples, n_features)"""
 
-def load_idx_src(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    return _single_tensor("idx_src", root=root, device=device)
-
-
-def load_idx_tgt(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    return _single_tensor("idx_tgt", root=root, device=device)
-
-
-def load_idx_pathway(*, root: Path = DATA_PATH, device: torch.device = DEFAULT_DEVICE) -> torch.Tensor:
-    return _single_tensor("idx_pathway", root=root, device=device)
-
-def load_input(*, root: Path = DATA_PATH) -> np.ndarray:
     tumor_df, nodes_df, _, _ = load_metapathway_tables(root=root)
     tumor_df = filter_input_df(tumor_df, nodes_df, "#Id")
 
     return tumor_df.T.values
+
+def create_split_indices(save_file: Path, seed: int | None = None) -> None:
+    """
+    Generate and save to json indices for each sample and divide the dataset into three subsets: train, validation and test
+
+    Parameters
+    ----------
+    save_file
+        file path where the json is saved
+    seed
+        used for random shuffling of the subsets, if none it is generated
+    """
+
+    n_samples = load_input().shape[0]
+    idx_all = np.arange(n_samples)
+
+    if seed is None:
+        seed = secrets.randbits(32)
+    np.random.default_rng(seed).shuffle(idx_all)
+
+    n_train = int(n_samples * utils.TRAIN_SPLIT)
+    n_val   = int(n_samples * utils.VAL_SPLIT)
+    splits = {
+        "train": idx_all[:n_train].tolist(),
+        "val":   idx_all[n_train : n_train + n_val].tolist(),
+        "test":  idx_all[n_train + n_val :].tolist(),
+    }
+
+    save_file.write_text(json.dumps(splits, indent=2))

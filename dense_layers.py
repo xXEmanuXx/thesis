@@ -1,21 +1,14 @@
 import torch.nn as nn
 
-class DenseEncoder(nn.Sequential):
-    def __init__(self, pathway_dim: int, p_drop: float, negative_slope: float, mid_dim: int = 2048, bottleneck: int = 1024):
-         super().__init__(
-            nn.Linear(pathway_dim, mid_dim),
-            nn.LeakyReLU(negative_slope),
-            nn.Dropout(p_drop),
-            nn.Linear(mid_dim, bottleneck),
-            nn.LeakyReLU(negative_slope)
-        )
+import utils
 
-class DenseDecoder(nn.Sequential):
-    def __init__(self, pathway_dim: int, p_drop: float, negative_slope: float, mid_dim: int = 2048, bottleneck: int = 1024):
-        super().__init__(
-            nn.Linear(bottleneck, mid_dim),
+def make_layers(sizes: list[int], *, p_drop: float, negative_slope: float):
+    blocks = []
+    for in_f, out_f in zip(sizes, sizes[1:]):
+        blocks += [
+            nn.Linear(in_f, out_f, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE),
             nn.LeakyReLU(negative_slope),
             nn.Dropout(p_drop),
-            nn.Linear(mid_dim, pathway_dim),
-            nn.LeakyReLU(negative_slope)
-        )
+        ]
+
+    return nn.Sequential(*blocks)

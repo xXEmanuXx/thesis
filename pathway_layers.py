@@ -15,7 +15,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from data_loader import load_idx_pathway
+import utils
+import data_loader
 
 class PathwayEncoder(nn.Linear):
     mask: torch.Tensor
@@ -23,9 +24,9 @@ class PathwayEncoder(nn.Linear):
     scratch: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, mask, negative_slope: float, bias: bool = True) -> None:
-        super().__init__(in_features, out_features, bias)
+        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE)
         self.register_buffer("mask", mask)
-        self.register_buffer("idx_pathway",  load_idx_pathway())
+        self.register_buffer("idx_pathway", data_loader.load_idx("idx_pathway"))
 
         self.negative_slope = negative_slope
 
@@ -38,13 +39,14 @@ class PathwayEncoder(nn.Linear):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x[:, self.idx_pathway]
         z = F.leaky_relu(F.linear(x, self.weight * self.mask, self.bias), negative_slope=self.negative_slope)
+        
         return z
     
 class PathwayDecoder(nn.Linear):
     mask: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, negative_slope: float, bias: bool = True) -> None:
-        super().__init__(in_features, out_features, bias)
+        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE)
         self.register_buffer("mask", mask)
 
         self.negative_slope = negative_slope
@@ -56,4 +58,5 @@ class PathwayDecoder(nn.Linear):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         z = F.leaky_relu(F.linear(x, self.weight * self.mask, self.bias), negative_slope=self.negative_slope)
+        
         return z

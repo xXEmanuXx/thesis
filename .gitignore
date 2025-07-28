@@ -1,10 +1,4 @@
-# jupyter notebooks for data analysis
-*.ipynb
-
-# python cache directories
 __pycache__
-
-pca
-roadmap.txt
-unused
+*.ipynb
 sweeps
+roadmap.txt

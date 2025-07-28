@@ -18,9 +18,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from data_loader import load_idx_in, load_idx_src, load_idx_tgt, load_idx_pathway
-
-from utils import METAPATHWAY_NODES, DEFAULT_DEVICE, DEFAULT_DTYPE
+import data_loader
+import utils
 
 class MetapathwayEncoder(nn.Linear):
     mask: torch.Tensor
@@ -30,15 +29,15 @@ class MetapathwayEncoder(nn.Linear):
     scratch: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, negative_slope: float, bias: bool = True) -> None:
-        super().__init__(in_features, out_features, bias) # Initialize weight matrix and bias vector
+        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE) # Initialize weight matrix and bias vector
         
         self.register_buffer("mask", mask) # Mask specifying which edges are effectively there
         # Buffers used to filter and scatter metapathway layer
-        self.register_buffer("idx_in", load_idx_in())
-        self.register_buffer("idx_src", load_idx_src())
-        self.register_buffer("idx_tgt", load_idx_tgt())
+        self.register_buffer("idx_in", data_loader.load_idx("idx_in"))
+        self.register_buffer("idx_src", data_loader.load_idx("idx_src"))
+        self.register_buffer("idx_tgt", data_loader.load_idx("idx_tgt"))
 
-        self.register_buffer("scratch", torch.empty(0, dtype=DEFAULT_DTYPE, device=DEFAULT_DEVICE), persistent=False)
+        self.register_buffer("scratch", torch.empty(0, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE), persistent=False)
 
         self.negative_slope = negative_slope
 
@@ -50,8 +49,8 @@ class MetapathwayEncoder(nn.Linear):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         BATCH = x.size(0)
 
-        if self.scratch.numel() != BATCH * METAPATHWAY_NODES:
-            self.scratch = torch.zeros(BATCH, METAPATHWAY_NODES, dtype=x.dtype, device=x.device)
+        if self.scratch.numel() != BATCH * utils.METAPATHWAY_NODES:
+            self.scratch = torch.zeros(BATCH, utils.METAPATHWAY_NODES, dtype=x.dtype, device=x.device)
         else:
             with torch.no_grad():
                 self.scratch.zero_()
@@ -77,15 +76,15 @@ class MetapathwayDecoder(nn.Linear):
     scratch: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, mask: torch.Tensor,  negative_slope: float, bias: bool = True) -> None:
-        super().__init__(in_features, out_features, bias)
+        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE)
         self.register_buffer("mask", mask)
 
-        self.register_buffer("idx_pathway", load_idx_pathway())
-        self.register_buffer("idx_src", load_idx_src())
-        self.register_buffer("idx_tgt", load_idx_tgt())
-        self.register_buffer("idx_in", load_idx_in())
+        self.register_buffer("idx_pathway", data_loader.load_idx("idx_pathway"))
+        self.register_buffer("idx_src", data_loader.load_idx("idx_src"))
+        self.register_buffer("idx_tgt", data_loader.load_idx("idx_tgt"))
+        self.register_buffer("idx_in", data_loader.load_idx("idx_in"))
 
-        self.register_buffer("scratch", torch.empty(0, dtype=DEFAULT_DTYPE, device=DEFAULT_DEVICE), persistent=False)
+        self.register_buffer("scratch", torch.empty(0, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE), persistent=False)
 
         self.negative_slope = negative_slope
         
@@ -97,8 +96,8 @@ class MetapathwayDecoder(nn.Linear):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         BATCH = x.size(0)
 
-        if self.scratch.numel() != BATCH * METAPATHWAY_NODES:
-            self.scratch = torch.zeros(BATCH, METAPATHWAY_NODES, dtype=x.dtype, device=x.device)
+        if self.scratch.numel() != BATCH * utils.METAPATHWAY_NODES:
+            self.scratch = torch.zeros(BATCH, utils.METAPATHWAY_NODES, dtype=x.dtype, device=x.device)
         else:
             with torch.no_grad():
                 self.scratch.zero_()

@@ -2,10 +2,9 @@
 Utility helpers
 
 This module centralizes on:
-    - global hyper-parameters and paths
+    - global constants and paths
     - tensor initialization helpers
     - serialization of model checkpoints
-
 """
 
 from __future__ import annotations
@@ -17,29 +16,28 @@ import pandas as pd
 import torch
 import zstandard as zstd
 
-DEFAULT_DEVICE: torch.device = torch.device("cpu")
+DEFAULT_DEVICE: torch.device = torch.device("cuda")
 DEFAULT_DTYPE: torch.dtype = torch.float32
 
-DATA_PATH: Path = Path("data")
-RESULTS_DIR: Path = Path("sweeps")
+DATA_DIR = Path("data")
+RESULTS_DIR = Path("sweeps")
 RESULTS_DIR.mkdir(exist_ok=True)
-RESULTS_FILE: Path = RESULTS_DIR / "results.jsonl"
+RESULTS_FILE = RESULTS_DIR / "results.jsonl"
 RESULTS_FILE.touch(exist_ok=True)
-RESET_RESULTS_ON_START: bool = True
+
+SPLIT_FILE = RESULTS_DIR / "split_indices.json"
+TRAIN_SPLIT = 0.70
+VAL_SPLIT = 0.15
 
 METAPATHWAY_NODES = 20507
 
-BATCH_SIZE = 222
-NUM_EPOCH = 1
-VAL_SPLIT = 0.15
-EARLY_STOP = 10
-
-#DELTA_RAW = 700 # 57, 80, 41, 54, 700
-#DELTA_NORM = 20
+BATCH_SIZE = 200
+NUM_EPOCH = 200
+EARLY_STOP = 20
 
 def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
     """
-    Return a Boolean mask (out_features, in_features) for sparse edges.
+    Return a boolean mask (out_features, in_features) for sparse edges.
 
     Each unique value in **src**/**tgt** becomes in/out feature.
     The mask is `True` where an edge `(src[i], tgt[i])` exists.
@@ -55,7 +53,6 @@ def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
     -------
     torch.Tensor
         tensor containing `True` values where an edge exists between two nodes
-
     """
 
     src_unique = src.drop_duplicates().tolist()
@@ -80,7 +77,7 @@ def save_model(epoch: int,
                ckpt_path: Path) -> None:
 
     """
-    Compresses and saves to disk an object which contains information regardin the model training
+    Compresses and saves to disk a file which contains information regarding the model training
 
     Parameters
     ----------
@@ -105,14 +102,12 @@ def save_model(epoch: int,
         "model_state": model_state,
         "optimizer_state": optimizer_state,
         "scheduler_state": scheduler_state
-    }, buf)
+    }, buf, _use_new_zipfile_serialization=False)
 
     compressed = zstd.ZstdCompressor().compress(buf.getvalue())
-
     ckpt_path.write_bytes(compressed)
 
 def load_model(*, map_location: torch.device = DEFAULT_DEVICE, ckpt_path: Path) -> dict[str, Any]:
-
     """
     Decompresses and loads the model for training
 
@@ -126,6 +121,7 @@ def load_model(*, map_location: torch.device = DEFAULT_DEVICE, ckpt_path: Path) 
 
     compressed = ckpt_path.read_bytes()
     decompressed = zstd.ZstdDecompressor().decompress(compressed)
+    
     buf = io.BytesIO(decompressed)
     ckpt = torch.load(buf, map_location=map_location)
 
