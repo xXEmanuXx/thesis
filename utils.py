@@ -71,8 +71,6 @@ def build_mask(src: pd.Series, tgt: pd.Series) -> torch.Tensor:
 def save_model(epoch: int, 
                epoch_loss: float, 
                model_state: dict[str, Any], 
-               optimizer_state: dict[str, Any], 
-               scheduler_state: dict[str, Any],
                *,
                ckpt_path: Path) -> None:
 
@@ -100,8 +98,6 @@ def save_model(epoch: int,
         "epoch": epoch,
         "epoch_loss": epoch_loss,
         "model_state": model_state,
-        "optimizer_state": optimizer_state,
-        "scheduler_state": scheduler_state
     }, buf, _use_new_zipfile_serialization=False)
 
     compressed = zstd.ZstdCompressor().compress(buf.getvalue())

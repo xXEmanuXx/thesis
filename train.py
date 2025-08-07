@@ -126,7 +126,7 @@ def main(args: argparse.Namespace):
             state.best_epoch = epoch
             state.epochs_no_improve = 0
 
-            utils.save_model(epoch, val_loss, model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), ckpt_path=run_dir / "best.pt")
+            utils.save_model(epoch, val_loss, model.state_dict(), ckpt_path=run_dir / "best.pt")
             print(f"new best (val_loss={val_loss:.4f}) saved")
         else:
             state.epochs_no_improve += 1
