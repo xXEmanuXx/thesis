@@ -29,10 +29,9 @@ class MetapathwayEncoder(nn.Linear):
     scratch: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, mask: torch.Tensor, negative_slope: float, bias: bool = True) -> None:
-        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE) # Initialize weight matrix and bias vector
+        super().__init__(in_features, out_features, bias, device=utils.DEFAULT_DEVICE, dtype=utils.DEFAULT_DTYPE)
         
-        self.register_buffer("mask", mask) # Mask specifying which edges are effectively there
-        # Buffers used to filter and scatter metapathway layer
+        self.register_buffer("mask", mask)
         self.register_buffer("idx_in", data_loader.load_idx("idx_in"))
         self.register_buffer("idx_src", data_loader.load_idx("idx_src"))
         self.register_buffer("idx_tgt", data_loader.load_idx("idx_tgt"))

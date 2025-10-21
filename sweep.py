@@ -7,6 +7,7 @@ and saves metrics in `sweeps/results.jsonl`
 
 from __future__ import annotations
 
+import argparse
 import itertools
 import json
 import os
@@ -17,7 +18,7 @@ from typing import Dict, List
 import utils
 import data_loader
 
-PARAM_GRID: Dict[str, List] = {
+""" PARAM_GRID: Dict[str, List] = {
     "lr": ["1e-3,1e-2", "1e-3,3e-3", "3e-4,1e-2"],
     "weight_decay": [0.0, 1e-4],
     "dropout": [0.0, 0.1],
@@ -25,6 +26,16 @@ PARAM_GRID: Dict[str, List] = {
     "grad_clip": [1.0],
     "latent_dim": [1024, 512],
     "fc_dims": ["2048,1024", "1536,1024"],
+} """
+
+PARAM_GRID: Dict[str, List] = {
+    "lr": ["1e-3,3e-3"],
+    "weight_decay": [0.0],
+    "dropout": [0.0],
+    "negative_slope": [0.03],
+    "grad_clip": [1.0],
+    "latent_dim": [1024],
+    "fc_dims": ["1536,1024"],
 }
 
 def dict_product(param_grid: Dict[str, List]):
@@ -33,12 +44,12 @@ def dict_product(param_grid: Dict[str, List]):
     for comb in itertools.product(*vals):
         yield dict(zip(keys, comb))
 
-def run_single(cfg: Dict, run_id: str):
+def run_single(cfg: Dict, run_id: str, mode: str):
     """Executes `train.py` with one combination of hyper-parameters"""
     env = os.environ.copy()
     hp_args = list(itertools.chain.from_iterable((f"--{k}", str(v)) for k, v in cfg.items()))
 
-    cmd = ["python", "train.py", "--run_id", run_id, *hp_args,]
+    cmd = ["python", "train.py", "--run_id", run_id, "--mode", mode, *hp_args,]
 
     print("Launch:", " ".join(cmd))
     subprocess.run(cmd, env=env, check=True)
@@ -50,14 +61,19 @@ def run_single(cfg: Dict, run_id: str):
         f.write(json.dumps({"run_id": run_id, **cfg, **metrics}) + "\n")
 
 if __name__ == "__main__":
-    # Commentare queste due righe per evitare reset di 'results.jsonl' e di 'split_indices.json'
-    utils.RESULTS_FILE.write_text("")
-    data_loader.create_split_indices(utils.SPLIT_FILE)
+    # Commentare queste dueclear righe per evitare reset di 'results.jsonl' e di 'split_indices.json'
+    #utils.RESULTS_FILE.write_text("")
+    #data_loader.create_split_indices(utils.SPLIT_FILE)
     # Decommentare se si vuole un seed fissato per ogni grid search
     #data_loader.create_split_indices(utils.SPLIT_FILE, seed=12345)
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--mode", required=True, help="raw or norm data")
+
+    args = p.parse_args()
         
     all_cfgs = list(dict_product(PARAM_GRID))
     for i, cfg in enumerate(all_cfgs):
         run_id = f"sweep_{i:04d}"
         print(f"[{datetime.now().isoformat(timespec="seconds")}] Run {run_id} -> {cfg}")
-        run_single(cfg, run_id)
+        run_single(cfg, run_id, args.mode)

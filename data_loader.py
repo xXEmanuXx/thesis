@@ -40,7 +40,7 @@ def filter_input_df(df: pd.DataFrame, filter_df: pd.DataFrame, filter_id_col: st
     input_nodes = df.index.values.astype(str).tolist()
     filter_nodes = filter_df[filter_id_col].tolist()
 
-    filtered_input_nodes = [int(node) for node in input_nodes if node in filter_nodes]
+    filtered_input_nodes = [int(str(node)) for node in input_nodes if str(node) in filter_nodes]
 
     return df.loc[filtered_input_nodes]
 
@@ -140,17 +140,6 @@ def load_input(*, root: Path = utils.DATA_DIR) -> np.ndarray:
     return tumor_df.T.values
 
 def create_split_indices(save_file: Path, seed: int | None = None) -> None:
-    """
-    Generate and save to json indices for each sample and divide the dataset into three subsets: train, validation and test
-
-    Parameters
-    ----------
-    save_file
-        file path where the json is saved
-    seed
-        used for random shuffling of the subsets, if none it is generated
-    """
-
     n_samples = load_input().shape[0]
     idx_all = np.arange(n_samples)
 

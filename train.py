@@ -30,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Train Metapathway Auto-Encoder")
 
     p.add_argument("--run_id", required=True, help="unique run id")
+    p.add_argument("--mode", required=True)
     p.add_argument("--lr", default="1e-3,1e-2")
     p.add_argument("--weight_decay", type=float, default=0.0)
     p.add_argument("--dropout", type=float, default=0.1)
@@ -80,15 +81,18 @@ def main(args: argparse.Namespace):
     run_dir = utils.RESULTS_DIR / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    scaler = StandardScaler()
-    input_data_norm = scaler.fit_transform(data_loader.load_input())
-    joblib.dump(scaler, run_dir / "scaler.pkl")
+    if args.mode == "norm":
+        scaler = StandardScaler()
+        input_data = scaler.fit_transform(data_loader.load_input())
+        joblib.dump(scaler, run_dir / "scaler.pkl")
+    else:
+        input_data = data_loader.load_input()
 
-    inputs = torch.tensor(input_data_norm, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)
+    input_tensor = torch.tensor(input_data, dtype=utils.DEFAULT_DTYPE, device=utils.DEFAULT_DEVICE)
 
     splits = json.loads(utils.SPLIT_FILE.read_text())
 
-    dataset = TensorDataset(inputs)
+    dataset = TensorDataset(input_tensor)
     train_set = Subset(dataset, splits["train"])
     val_set = Subset(dataset, splits["val"])
     train_loader = DataLoader(train_set, batch_size=utils.BATCH_SIZE, shuffle=True)
