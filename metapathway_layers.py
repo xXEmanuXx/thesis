@@ -15,8 +15,8 @@ This module implement both the metapathway layer encoder and decoder described b
 """
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+from torch.nn import functional as F
 
 import data_loader
 import utils

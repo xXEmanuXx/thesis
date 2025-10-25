@@ -12,11 +12,11 @@ This module implement both the encoder and decoder layer described by the `metap
 """
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+from torch.nn import functional as F
 
-import utils
 import data_loader
+import utils
 
 class PathwayEncoder(nn.Linear):
     mask: torch.Tensor

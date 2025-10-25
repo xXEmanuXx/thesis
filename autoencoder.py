@@ -12,7 +12,7 @@ This module describes the definition of the autoencoder
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from metapathway_layers import MetapathwayEncoder, MetapathwayDecoder
 from pathway_layers import PathwayEncoder, PathwayDecoder

@@ -35,7 +35,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--weight_decay", type=float, default=0.0)
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--negative_slope", type=float, default=0.03)
-    p.add_argument("--grad_clip", type=float, default=1.0)
     p.add_argument("--latent_dim", type=int, default=1024)
     p.add_argument("--fc_dims", default="2048,1024")
 
@@ -47,7 +46,7 @@ class RunState:
     best_epoch: int = -1
     epochs_no_improve: int = 0
 
-def train_one_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, scheduler, grad_clip: float):
+def train_one_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, scheduler, grad_clip: float = 1.0):
     model.train()
     running = 0.0
     for xb, in loader:
@@ -120,7 +119,7 @@ def main(args: argparse.Namespace):
 
     stopped_reason = "max_epochs"
     for epoch in range(1, utils.NUM_EPOCH + 1):
-        tr_loss = train_one_epoch(model, train_loader, criterion, optimizer, scheduler, args.grad_clip)
+        tr_loss = train_one_epoch(model, train_loader, criterion, optimizer, scheduler)
         val_loss = validate(model, val_loader, criterion)
         
         print(f"Epoch {epoch}/{utils.NUM_EPOCH}: train_loss={tr_loss:.4f} val_loss={val_loss:.4f}")

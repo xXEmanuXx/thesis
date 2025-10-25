@@ -23,7 +23,6 @@ import data_loader
     "weight_decay": [0.0, 1e-4],
     "dropout": [0.0, 0.1],
     "negative_slope": [0.02, 0.03],
-    "grad_clip": [1.0],
     "latent_dim": [1024, 512],
     "fc_dims": ["2048,1024", "1536,1024"],
 } """
@@ -33,7 +32,6 @@ PARAM_GRID: Dict[str, List] = {
     "weight_decay": [0.0],
     "dropout": [0.0],
     "negative_slope": [0.03],
-    "grad_clip": [1.0],
     "latent_dim": [1024],
     "fc_dims": ["1536,1024"],
 }
