@@ -24,6 +24,8 @@ RESULTS_DIR = Path("sweeps")
 RESULTS_DIR.mkdir(exist_ok=True)
 RESULTS_FILE = RESULTS_DIR / "results.jsonl"
 RESULTS_FILE.touch(exist_ok=True)
+PLOTS_DIR = RESULTS_DIR / "plots"
+PLOTS_DIR.mkdir(exist_ok=True)
 
 SPLIT_FILE = RESULTS_DIR / "split_indices.json"
 TRAIN_SPLIT = 0.70

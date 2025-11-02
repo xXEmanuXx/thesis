@@ -9,9 +9,52 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 import data_loader
 import model_builder
 import utils
+
+# === Plots ===
+
+def plot_kde_error_comparison(df_in_raw: pd.DataFrame, df_out_raw: pd.DataFrame, df_in_norm_raw: pd.DataFrame, df_out_norm_raw: pd.DataFrame) -> None:
+    mae_raw = (df_out_raw - df_in_raw).abs().mean(axis=1)
+    mae_norm = (df_out_norm_raw - df_in_norm_raw).abs().mean(axis=1)
+
+    plt.figure(figsize=(8, 5))
+    sns.kdeplot(x=mae_raw, label="Raw-trained model", fill=True, alpha=0.4)
+    sns.kdeplot(x=mae_norm, label="Normalized-trained model", fill=True, alpha=0.4)
+    plt.xlabel("Mean Absolute Error per sample")
+    plt.ylabel("Density")
+    plt.title("Distribuzione degli errori di ricostruzione — Raw vs Normalized")
+    plt.legend()
+    plt.tight_layout()
+
+    save_path = utils.PLOTS_DIR / "kde_error_comparison.png"
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_mse_distribution(df_in: pd.DataFrame, df_out: pd.DataFrame, model_label: str) -> None:
+    mse_per_sample = ((df_out - df_in)**2).mean(axis=1)
+
+    print(mse_per_sample)
+    
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(mse_per_sample) + 1), mse_per_sample, marker='o', linestyle='-', color='b')
+    #sns.histplot(x=mse_per_sample, bins=1000, kde=True, color='tab:green', alpha=0.6)
+    #plt.xscale('log')
+    plt.yscale('log')
+    #plt.xlabel('Mean Squared Error per sample')
+    #plt.ylabel('Density')
+    plt.xlabel('Samples')
+    plt.ylabel('MSE value')
+    plt.title(f"MSE error distribution per sample - {model_label}")
+    plt.tight_layout()
+
+    save_path = utils.PLOTS_DIR / f"mse_distribution_{model_label}.png"
+    #plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
 
 # === Utilities ===
 
@@ -206,10 +249,11 @@ def single_model(type: str, run_id: str, n_samples: int, n_features: int):
         print(f"MSE_raw: {metrics_raw['MSE_raw']:.6f}")
         print(f"MAE_raw: {metrics_raw['MAE_raw']:.6f}")
 
+        plot_mse_distribution(df_in_raw, df_out_raw, args.run_id)
+
         return {
             "raw": {"metrics": metrics_raw, "df_in_raw": df_in_raw, "df_out_raw": df_out_raw},
         }
-
     elif (type == 'norm'):
         section("=== NORMALIZED-TRAINED MODEL ===")
         metrics_norm, df_in_norm, df_out_norm, df_in_norm_raw, df_out_norm_raw = evaluate_norm_model(run_id, n_samples, n_features)
@@ -219,7 +263,8 @@ def single_model(type: str, run_id: str, n_samples: int, n_features: int):
         print(f"MAE_raw: (inv-transformed): {metrics_norm['MAE_raw']:.6f}")
         print(f"MSE_norm (normalized space): {metrics_norm.get('MSE_norm', float('nan')):.6f}")
 
-        # If you want to keep DataFrames for further programmatic use, return them:
+        plot_mse_distribution(df_in_norm_raw, df_out_norm_raw, args.run_id)
+
         return {
             "norm": {
                 "metrics": metrics_norm,
@@ -253,7 +298,10 @@ def compare_models(run_raw: str, run_norm: str, n_samples: int, n_features: int)
     else:
         print("\n→ Normalized-trained model performs better on raw reconstruction (lower MSE_raw).")
 
-    # If you want to keep DataFrames for further programmatic use, return them:
+    print("Generating comparison plot...")
+
+    plot_kde_error_comparison(df_in_raw, df_out_raw, df_in_norm_raw, df_out_norm_raw)
+
     return {
         "raw": {"metrics": metrics_raw, "df_in_raw": df_in_raw, "df_out_raw": df_out_raw},
         "norm": {

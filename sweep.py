@@ -18,22 +18,13 @@ from typing import Dict, List
 import utils
 import data_loader
 
-""" PARAM_GRID: Dict[str, List] = {
+PARAM_GRID: Dict[str, List] = {
     "lr": ["1e-3,1e-2", "1e-3,3e-3", "3e-4,1e-2"],
     "weight_decay": [0.0, 1e-4],
     "dropout": [0.0, 0.1],
     "negative_slope": [0.02, 0.03],
     "latent_dim": [1024, 512],
     "fc_dims": ["2048,1024", "1536,1024"],
-} """
-
-PARAM_GRID: Dict[str, List] = {
-    "lr": ["1e-3,3e-3"],
-    "weight_decay": [0.0],
-    "dropout": [0.0],
-    "negative_slope": [0.03],
-    "latent_dim": [1024],
-    "fc_dims": ["1536,1024"],
 }
 
 def dict_product(param_grid: Dict[str, List]):
@@ -59,11 +50,9 @@ def run_single(cfg: Dict, run_id: str, mode: str):
         f.write(json.dumps({"run_id": run_id, **cfg, **metrics}) + "\n")
 
 if __name__ == "__main__":
-    # Commentare queste dueclear righe per evitare reset di 'results.jsonl' e di 'split_indices.json'
+    # Commentare queste due righe per evitare reset di 'results.jsonl' e di 'split_indices.json'
     #utils.RESULTS_FILE.write_text("")
     #data_loader.create_split_indices(utils.SPLIT_FILE)
-    # Decommentare se si vuole un seed fissato per ogni grid search
-    #data_loader.create_split_indices(utils.SPLIT_FILE, seed=12345)
 
     p = argparse.ArgumentParser()
     p.add_argument("--mode", required=True, help="raw or norm data")

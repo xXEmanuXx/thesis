@@ -22,6 +22,9 @@ from torch.utils.data import DataLoader, TensorDataset, Subset
 
 from sklearn.preprocessing import StandardScaler
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 import data_loader
 import model_builder
 import utils
@@ -46,7 +49,7 @@ class RunState:
     best_epoch: int = -1
     epochs_no_improve: int = 0
 
-def train_one_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, scheduler, grad_clip: float = 1.0):
+def train_one_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, scheduler, grad_clip: float = 1.0) -> float:
     model.train()
     running = 0.0
     for xb, in loader:
@@ -63,8 +66,7 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, 
 
     return running / len(loader)
 
-
-def validate(model: nn.Module, loader: DataLoader, criterion):
+def validate(model: nn.Module, loader: DataLoader, criterion) -> float:
     model.eval()
     running = 0.0
     with torch.no_grad():
@@ -75,6 +77,20 @@ def validate(model: nn.Module, loader: DataLoader, criterion):
             running += loss.item()
 
     return running / len(loader)
+
+def plot_training_curves(train_losses, val_losses, run_dir):
+    epochs = np.arange(1, len(train_losses) + 1)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, train_losses, label="Train Loss", color="tab:blue")
+    plt.plot(epochs, val_losses, label="Validation Loss", color="tab:orange")
+    plt.title("Training and Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(run_dir / "loss_curve.png", dpi=300)
+    plt.close()
 
 def main(args: argparse.Namespace):
     run_dir = utils.RESULTS_DIR / args.run_id
@@ -117,11 +133,15 @@ def main(args: argparse.Namespace):
 
     state = RunState()
 
+    train_losses, val_losses = [], []
     stopped_reason = "max_epochs"
     for epoch in range(1, utils.NUM_EPOCH + 1):
         tr_loss = train_one_epoch(model, train_loader, criterion, optimizer, scheduler)
         val_loss = validate(model, val_loader, criterion)
-        
+
+        train_losses.append(tr_loss)
+        val_losses.append(val_loss)
+
         print(f"Epoch {epoch}/{utils.NUM_EPOCH}: train_loss={tr_loss:.4f} val_loss={val_loss:.4f}")
 
         if val_loss + 1e-8 < state.best_val:
@@ -133,10 +153,12 @@ def main(args: argparse.Namespace):
             print(f"new best (val_loss={val_loss:.4f}) saved")
         else:
             state.epochs_no_improve += 1
-            if state.epochs_no_improve >= utils.EARLY_STOP:
+            """ if state.epochs_no_improve >= utils.EARLY_STOP:
                 stopped_reason = "early_stop"
                 print(f"Early-stopping: no improvements since {utils.EARLY_STOP} epochs")
-                break
+                break """
+
+    plot_training_curves(train_losses, val_losses, run_dir)
 
     metrics = {"val_loss": state.best_val, "epoch": state.best_epoch, "stopped_reason": stopped_reason}
     with open(run_dir / "metrics.json", "w") as fp:
